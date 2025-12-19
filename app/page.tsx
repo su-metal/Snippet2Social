@@ -87,6 +87,7 @@ export default function Home() {
 
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isResultEditing, setIsResultEditing] = useState(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -279,6 +280,7 @@ export default function Home() {
       saveToHistory(result, selectedPlatform);
       incrementUsage();
       setStatus('success');
+      setIsResultEditing(false);
       setTimeout(() => document.getElementById('result-section')?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch (error) {
       setStatus('error');
@@ -737,11 +739,23 @@ export default function Home() {
         {/* Result Area */}
         {(status === 'success' || generatedContent) && (
           <div id="result-section" className="space-y-8 animate-fade-in duration-700">
-            <div className="flex items-center justify-between px-1">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
               <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AI生成された投稿</h2>
-              <span className={`text-[10px] px-3 py-1 rounded-full font-bold shadow-sm ${isPro ? 'bg-amber-100 text-amber-700' : 'bg-brand-50 text-brand-700'}`}>
-                {STRATEGIES[selectedPlatform].name}
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsResultEditing((prev) => !prev)}
+                  disabled={!generatedContent && mainTweets.length === 0}
+                  className={`text-[10px] font-black uppercase tracking-[0.35em] px-3 py-1 rounded-full border transition-colors ${
+                    isResultEditing ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 text-slate-500 hover:border-brand-200 hover:text-brand-600'
+                  } ${!generatedContent && mainTweets.length === 0 ? 'opacity-40 cursor-not-allowed' : ''}`}
+                >
+                  {isResultEditing ? '完了' : '編集'}
+                </button>
+                <span className={`text-[10px] px-3 py-1 rounded-full font-bold shadow-sm ${isPro ? 'bg-amber-100 text-amber-700' : 'bg-brand-50 text-brand-700'}`}>
+                  {STRATEGIES[selectedPlatform].name}
+                </span>
+              </div>
             </div>
 
             {selectedPlatform === 'multi' && multiContent && (
@@ -807,6 +821,7 @@ export default function Home() {
                           <textarea
                             value={tweet.text}
                             onChange={(e) => handleTweetTextChange(tweet.id, e.target.value)}
+                            readOnly={!isResultEditing}
                             className="w-full bg-white px-4 py-5 text-base leading-relaxed text-slate-700 outline-none resize-none rounded-b-[2rem] border-0"
                             rows={4}
                           />
@@ -814,12 +829,13 @@ export default function Home() {
                       ))
                     ) : (
                       <div className="bg-white shadow-sm rounded-[2rem] border border-slate-200 p-4">
-                        <textarea
-                          value={generatedContent}
-                          readOnly
-                          className="w-full bg-transparent text-base leading-relaxed text-slate-600 outline-none resize-none"
-                          rows={4}
-                        />
+                      <textarea
+                        value={generatedContent}
+                        onChange={(e) => setGeneratedContent(e.target.value)}
+                        readOnly={!isResultEditing}
+                        className="w-full bg-transparent text-base leading-relaxed text-slate-600 outline-none resize-none"
+                        rows={4}
+                      />
                       </div>
                     )}
                   </div>
@@ -847,6 +863,7 @@ export default function Home() {
                   <textarea
                     value={generatedContent}
                     onChange={(e) => setGeneratedContent(e.target.value)}
+                    readOnly={!isResultEditing}
                     className="w-full bg-transparent text-base leading-relaxed text-slate-700 outline-none resize-none"
                     rows={8}
                   />
@@ -900,6 +917,7 @@ export default function Home() {
                           <textarea
                             value={variant.body}
                             onChange={(e) => handleVariantTextChange(variant.id, e.target.value)}
+                            readOnly={!isResultEditing}
                             className="mt-4 w-full rounded-[1.5rem] border border-slate-100 px-3 py-4 text-sm leading-relaxed text-slate-700 outline-none resize-none"
                             rows={6}
                           />
