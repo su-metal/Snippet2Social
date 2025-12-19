@@ -1,0 +1,8 @@
+
+{
+  "name": "Snippet2Social (Next.js)",
+  "description": "Convert your raw thoughts into SNS posts with Next.js App Router and Gemini AI.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
