@@ -10,7 +10,6 @@ import {
   Languages, Ruler, Smile, Heart, Wand2
 } from 'lucide-react';
 import { STRATEGIES, DEFAULT_STRATEGY_ID } from '../constants';
-import { generatePost, generatePostImage } from '../services/geminiService';
 import { HistoryItem } from '../types';
 import { Button } from '../components/Button';
 import { useUser } from '../context/UserContext';
@@ -165,20 +164,33 @@ export default function Home() {
     setImageStatuses({});
 
     try {
-      const result = await generatePost(
-        inputText, 
-        selectedPlatform, 
-        selectedLanguage, 
-        humorLevel, 
-        emotionLevel, 
-        postIntent, 
-        isThreadMode, 
-        isLongVideo,
-        isPro,
-        customInstruction,
-        lengthOption,
-        perspective
-      );
+      const response = await fetch('/api/generate-post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputText,
+          selectedPlatform,
+          selectedLanguage,
+          humorLevel,
+          emotionLevel,
+          postIntent,
+          isThreadMode,
+          isLongVideo,
+          isPro,
+          customInstruction,
+          lengthOption,
+          perspective,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error ?? 'AI生成に失敗しました');
+      }
+
+      const { result } = await response.json();
       
       if (selectedPlatform === 'multi') {
         try {
@@ -210,8 +222,29 @@ export default function Home() {
     setImageStatuses(prev => ({ ...prev, [key]: 'loading' }));
     
     try {
-      const url = await generatePostImage(generatedContent, key);
-      setImages(prev => ({ ...prev, [key]: url }));
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          postContent: generatedContent,
+          platform: key,
+        }),
+      });
+
+      if (!response.ok) {
+        setImageStatuses(prev => ({ ...prev, [key]: 'error' }));
+        return;
+      }
+
+      const data = await response.json();
+      if (!data?.url) {
+        setImageStatuses(prev => ({ ...prev, [key]: 'error' }));
+        return;
+      }
+
+      setImages(prev => ({ ...prev, [key]: data.url }));
       setImageStatuses(prev => ({ ...prev, [key]: 'success' }));
     } catch (error) {
       setImageStatuses(prev => ({ ...prev, [key]: 'error' }));

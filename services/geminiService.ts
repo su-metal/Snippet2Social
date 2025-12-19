@@ -132,7 +132,7 @@ export const generatePost = async (
   if (!strategy) throw new Error(`Invalid platform selected: ${platformId}`);
 
   // Select model based on Pro status or Multi mode
-  const modelName = (isPro || platformId === 'multi') ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
+  const modelName = (isPro || platformId === 'multi') ? 'gemini-2.5-flash' : 'gemini-2.5-flash';
   console.log(`[Snippet2Social] Generating: model=${modelName}, platform=${platformId}, perspective=${perspective}`);
 
   const perspectiveInstruction = getPerspectiveInstruction(perspective);
