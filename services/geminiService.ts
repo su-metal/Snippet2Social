@@ -202,7 +202,7 @@ export const generatePostImage = async (postContent: string, platform: string): 
 
   // 1. Prompt Refinement (Art Direction)
   const promptRefiner = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.5-flash',
     contents: `Convert the following social media post into a high-quality English image generation prompt. 
     Subject: Main topic of the post.
     Style: Modern, professional, cinematic lighting, 4k, artistic. 
