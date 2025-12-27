@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { STRATEGIES } from "../constants";
+import { STRATEGIES, GOOGLE_MAP_INTENT_IDS } from "../constants";
 
 const getPerspectiveInstruction = (perspective: string): string => {
   if (perspective === 'business') {
@@ -59,6 +59,28 @@ const getLengthInstruction = (option: string, platformId: string, allowPremiumLo
   return `\n[Content Length: ${option.toUpperCase()}]\n${instruction} ${limitNote}`;
 };
 
+const GOOGLE_MAP_LENGTH_GUIDES: Record<string, string> = {
+  short: `
+    \n[Google Map Length: Short]
+    1-2 sentences. Keep it extremely concise: thank/apologize/answer with just the core point, avoid extra background, aim for ~60-120 Japanese characters or 20-40 English words.
+    Purpose: fast replies for busy teams.
+  `,
+  medium: `
+    \n[Google Map Length: Medium]
+    3-4 sentences. Start with a greeting, summarize the review in one sentence, deliver the key response, and finish with a brief closing thought (~120-220 Japanese characters or 40-80 English words).
+    Purpose: the standard polite reply.
+  `,
+  long: `
+    \n[Google Map Length: Long]
+    5-7 sentences. Include a greeting, mention 1-2 specific review points, provide a fuller thank-you/apology/answer (with improvement note if relevant), and end with a sincere close (~220-400 Japanese characters or 80-140 English words).
+    Purpose: show extra care without drifting into a wall of text.
+  `,
+};
+
+const getGoogleMapLengthInstruction = (option: string): string => {
+  return GOOGLE_MAP_LENGTH_GUIDES[option] || GOOGLE_MAP_LENGTH_GUIDES.medium;
+};
+
 const getPremiumLongInstruction = (enabled: boolean): string => {
   if (!enabled) return "";
   return `
@@ -78,6 +100,14 @@ const getIntentInstruction = (intent: string): string => {
       return "\n[Post Intent: Educational]\nWrite an educational post. Focus on providing value, tips, or 'how-to' knowledge.";
     case 'engagement':
       return "\n[Post Intent: Engagement]\nWrite to generate comments. Ask questions and encourage interaction with the audience.";
+    case GOOGLE_MAP_INTENT_IDS.THANK_YOU:
+      return "\n[Post Intent: Google Map — Thank You]\nRespond with gratitude, reference the positive points in the review, and close with a warm welcome back.";
+    case GOOGLE_MAP_INTENT_IDS.APOLOGY:
+      return "\n[Post Intent: Google Map — Apology]\nApologize sincerely, acknowledge the issues raised, and assure the reviewer you are addressing them.";
+    case GOOGLE_MAP_INTENT_IDS.ANSWER:
+      return "\n[Post Intent: Google Map — Question Answer]\nThank the reviewer for their question, restate it briefly, and provide a clear, helpful answer.";
+    case GOOGLE_MAP_INTENT_IDS.AUTO:
+      return "\n[Post Intent: Google Map — Auto]\nDetermine whether the review is praise, a complaint, or a question, then use the structure for that scenario.";
     default:
       return "";
   }
@@ -119,6 +149,54 @@ const getVideoInstruction = (isLongVideo: boolean): string => {
   }
 };
 
+const GOOGLE_MAP_CONTEXT_INSTRUCTION = `
+  \n[Google Map Reply Context]
+  Treat the user's input as a Google Maps review. Reply as the business, using "we", "our team", or "I" (owner/staff) voice.
+  Mention one or two concrete points from the review to show you read it, keep the tone sincere and non-promotional, and avoid hashtags or numbered lists.
+  Never ask the reviewer to visit the store or require in-person contact; do not request phone, email, DM, or form follow-up, nor ask them any further questions. Keep the reply fully self-contained without asking for any additional action.
+  When referencing the review, do not parrot the exact sentences or wording. Summarize the impression from the business perspective using naturally phrased gratitude, empathy, or explanation.
+  Stick to short-to-medium length sentences and limit emojis; the output should be a single reply message with no extra commentary.
+`;
+
+const STRUCTURE_INSTRUCTIONS: Record<string, string> = {
+  [GOOGLE_MAP_INTENT_IDS.THANK_YOU]: `
+    \n[Google Map Structure: Thank You Reply]
+    1. Begin with a heartfelt thank-you for their positive review.
+    2. Reference one or two specific highlights they mentioned.
+    3. Close by inviting them back or expressing continued support.
+    Keep the tone warm, sincere, and concise. Do not turn this into a promotional pitch or a numbered list. A gentle re-invitation like "またのご来店をお待ちしております" is fine here.
+  `,
+  [GOOGLE_MAP_INTENT_IDS.APOLOGY]: `
+    \n[Google Map Structure: Apology / Issue Response]
+    1. Open with a sincere apology for the experience they described.
+    2. Acknowledge that you understand the issue they raised.
+    3. Mention the steps you are taking (or will take) to improve.
+    4. Keep the reply fully self-contained: do NOT invite further contact or ask for additional information, and do not direct them to visit the store.
+    Paraphrase their concern from the staff perspective rather than repeating their wording, and emphasize empathy plus improvement intent.
+    Keep the tone calm, solution-focused, and avoid defensive language.
+  `,
+  [GOOGLE_MAP_INTENT_IDS.ANSWER]: `
+    \n[Google Map Structure: Question Response]
+    1. Thank them for their question or curiosity.
+    2. Restate the question in your own words to show understanding.
+    3. Provide a concise, accurate answer.
+    4. Add any helpful details (e.g., hours, reservation info, or access tips) if relevant.
+    Provide the requested information directly without asking for a follow-up, and paraphrase the question from your own voice rather than mirroring the reviewer's words.
+    Keep the reply practical, friendly, and easy to understand.
+  `,
+  [GOOGLE_MAP_INTENT_IDS.AUTO]: `
+    \n[Google Map Structure: Automatic Selection]
+    Decide whether the review is praise, a complaint, or a question, then follow the most appropriate structure above.
+    Always include at least one specific detail from the review, keep the tone measured, and do not introduce hashtags or overt marketing language.
+    Do not ask for any further contact or task outside this reply; describe the review points with your own phrasing rather than repeating them.
+  `,
+};
+
+const getStructureInstruction = (platformId: string, intent: string): string => {
+  if (platformId !== 'googlemap') return '';
+  return STRUCTURE_INSTRUCTIONS[intent] || STRUCTURE_INSTRUCTIONS[GOOGLE_MAP_INTENT_IDS.AUTO];
+};
+
 /**
  * Generates a social media post using the Gemini API.
  */
@@ -148,7 +226,7 @@ export const generatePost = async (
   if (!strategy) throw new Error(`Invalid platform selected: ${platformId}`);
 
   // Select model based on Pro status or Multi mode
-  const modelName = 'gemini-2.5-flash';
+  const modelName = 'gemini-2.5-flash-lite';
   console.log(`[Snippet2Social] Generating: model=${modelName}, platform=${platformId}, perspective=${perspective}`);
 
   const perspectiveInstruction = getPerspectiveInstruction(perspective);
@@ -156,6 +234,7 @@ export const generatePost = async (
   const moodInstruction = getMoodInstruction(humorLevel, emotionLevel);
   const premiumLongActive = platformId === 'twitter' && isPremiumLongPost;
   const lengthInstruction = getLengthInstruction(lengthOption, platformId, premiumLongActive);
+  const googleMapLengthInstruction = platformId === 'googlemap' ? getGoogleMapLengthInstruction(lengthOption) : "";
   const threadInstruction = platformId === 'twitter' ? getThreadInstruction(isThreadMode) : "";
   const videoInstruction = platformId === 'tiktok' ? getVideoInstruction(isLongVideo) : "";
   const languageInstruction = `\n\nIMPORTANT: Output the final result in ${language}.`;
@@ -165,6 +244,8 @@ export const generatePost = async (
     ? `\n\n[IMPORTANT USER INSTRUCTION]: ${customInstruction.trim()}`
     : "";
   const premiumLongInstruction = platformId === 'twitter' ? getPremiumLongInstruction(premiumLongActive) : "";
+  const googleMapContextInstruction = platformId === 'googlemap' ? GOOGLE_MAP_CONTEXT_INSTRUCTION : "";
+  const structureInstruction = getStructureInstruction(platformId, postIntent);
   
   let finalSystemInstruction =
     strategy.systemInstruction +
@@ -172,9 +253,12 @@ export const generatePost = async (
     intentInstruction +
     moodInstruction +
     lengthInstruction +
+    googleMapLengthInstruction +
     threadInstruction +
     videoInstruction +
     languageInstruction +
+    googleMapContextInstruction +
+    structureInstruction +
     customUserInstruction +
     premiumLongInstruction;
 
@@ -246,7 +330,7 @@ export const generatePostImage = async (postContent: string, platform: string): 
 
   // 1. Prompt Refinement (Art Direction)
   const promptRefiner = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash-lite',
     contents: `Convert the following social media post into a high-quality English image generation prompt. 
     Subject: Main topic of the post.
     Style: Modern, professional, cinematic lighting, 4k, artistic. 

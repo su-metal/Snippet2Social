@@ -6,10 +6,10 @@ import {
   Twitter, Instagram, Linkedin, Video, Sparkles, Mic, Eraser, 
   AlertCircle, ChevronDown, ChevronUp, Target, Settings, Layers, ShieldAlert,
   Timer, Image as ImageIcon, Download, Copy, Lock, 
-  Crown, User, Building2, Clock, X, Trash2, History,
+  Crown, User, Building2, Clock, X, Trash2, History, MapPin,
   Languages, Ruler, Smile, Heart, Wand2
 } from 'lucide-react';
-import { STRATEGIES, DEFAULT_STRATEGY_ID } from '../constants';
+import { STRATEGIES, DEFAULT_STRATEGY_ID, GOOGLE_MAP_INTENT_IDS } from '../constants';
 import { HistoryItem } from '../types';
 import { Button } from '../components/Button';
 import { useUser } from '../context/UserContext';
@@ -58,6 +58,19 @@ const INTENTS = [
   { id: 'engagement', label: '❓ 問いかけ・交流 (Engagement)' },
 ];
 
+const GOOGLE_MAP_INTENTS = [
+  { id: GOOGLE_MAP_INTENT_IDS.AUTO, label: '自動判定（AIに任せる）' },
+  { id: GOOGLE_MAP_INTENT_IDS.THANK_YOU, label: 'お礼返信（高評価レビュー向け）' },
+  { id: GOOGLE_MAP_INTENT_IDS.APOLOGY, label: 'お詫び・クレーム対応（低評価レビュー向け）' },
+  { id: GOOGLE_MAP_INTENT_IDS.ANSWER, label: '質問への回答' },
+];
+
+const DEFAULT_INPUT_LABEL = '2. メモ・下書き入力';
+const DEFAULT_INPUT_PLACEHOLDER = 'ここに思考の断片やメモを入力してください...';
+const GOOGLE_MAP_INPUT_LABEL = '2. Google マップレビュー本文入力';
+const GOOGLE_MAP_INPUT_PLACEHOLDER =
+  '返信したい Google マップのレビュー本文をそのまま貼り付けてください。Paste the full Google Maps review you want to reply to.';
+
 export default function Home() {
   const { isPro, usageCount, maxUsage, incrementUsage } = useUser();
   const [inputText, setInputText] = useState('');
@@ -72,7 +85,8 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const [selectedPlatform, setSelectedPlatform] = useState(DEFAULT_STRATEGY_ID);
-  const [postIntent, setPostIntent] = useState('default');
+  const [socialIntent, setSocialIntent] = useState('default');
+  const [googleMapIntent, setGoogleMapIntent] = useState(GOOGLE_MAP_INTENT_IDS.AUTO);
   const [isThreadMode, setIsThreadMode] = useState(false);
   const [isLongVideo, setIsLongVideo] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
@@ -100,6 +114,18 @@ export default function Home() {
 
   const isThreadLike = looksLikeThreadIndicator(generatedContent);
   const isThreadView = selectedPlatform === 'twitter' && !isXPremiumLongPost && (isThreadMode || isThreadLike);
+  const isGoogleMapPlatform = selectedPlatform === 'googlemap';
+  const intentOptions = isGoogleMapPlatform ? GOOGLE_MAP_INTENTS : INTENTS;
+  const activeIntentId = isGoogleMapPlatform ? googleMapIntent : socialIntent;
+  const inputStepLabel = isGoogleMapPlatform ? GOOGLE_MAP_INPUT_LABEL : DEFAULT_INPUT_LABEL;
+  const inputPlaceholder = isGoogleMapPlatform ? GOOGLE_MAP_INPUT_PLACEHOLDER : DEFAULT_INPUT_PLACEHOLDER;
+  const handleIntentSelect = (intentId: string) => {
+    if (isGoogleMapPlatform) {
+      setGoogleMapIntent(intentId);
+    } else {
+      setSocialIntent(intentId);
+    }
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem('s2s_history');
@@ -248,7 +274,7 @@ export default function Home() {
           selectedLanguage,
           humorLevel,
           emotionLevel,
-          postIntent,
+          postIntent: activeIntentId,
           isThreadMode: requestedThreadMode,
           isLongVideo,
           isPro,
@@ -386,6 +412,7 @@ export default function Home() {
       case 'instagram': return <Instagram className={cls} />;
       case 'linkedin': return <Linkedin className={cls} />;
       case 'tiktok': return <Video className={cls} />;
+      case 'googlemap': return <MapPin className={cls} />;
       case 'multi': return <Layers className={cls} />;
       default: return <Sparkles className={cls} />;
     }
@@ -508,13 +535,13 @@ export default function Home() {
 
         {/* Step 2: Input Textarea */}
         <section className="space-y-3 animate-slide-up">
-          <label className="text-xs font-bold text-slate-400 uppercase block tracking-widest px-1">2. メモ・下書き入力</label>
+          <label className="text-xs font-bold text-slate-400 uppercase block tracking-widest px-1">{inputStepLabel}</label>
           <div className="relative group">
             <textarea 
               ref={textareaRef} 
               value={inputText} 
               onChange={e => setInputText(e.target.value)} 
-              placeholder="ここに思考の断片やメモを入力してください..." 
+              placeholder={inputPlaceholder}
               className="w-full min-h-[160px] p-6 text-lg bg-white border border-slate-200 rounded-[2rem] focus:ring-8 focus:ring-brand-500/5 focus:border-brand-500 outline-none resize-none transition-all shadow-sm" 
               disabled={status === 'loading'} 
             />
@@ -543,11 +570,11 @@ export default function Home() {
               <Target size={14} /> 3. 投稿の目的
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {INTENTS.map((intent) => (
+              {intentOptions.map((intent) => (
                 <button
                   key={intent.id}
-                  onClick={() => setPostIntent(intent.id)}
-                  className={`px-4 py-3.5 rounded-2xl border text-sm font-bold text-left transition-all ${postIntent === intent.id ? 'bg-slate-900 border-slate-900 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                  onClick={() => handleIntentSelect(intent.id)}
+                  className={`px-4 py-3.5 rounded-2xl border text-sm font-bold text-left transition-all ${activeIntentId === intent.id ? 'bg-slate-900 border-slate-900 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
                 >
                   {intent.label}
                 </button>
