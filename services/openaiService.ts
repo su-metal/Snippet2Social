@@ -58,7 +58,11 @@ const getEmotionGuidance = (platformId: string, level: number): string => {
     : 'Lead with empathetic language, describe your own reaction, use vivid adjectives, and finish with a heartfelt closing (e.g., "It truly touched me").';
 };
 
-const getMoodInstruction = (platformId: string, humor: number, emotion: number): string => {
+const getMoodInstruction = (
+  platformId: string,
+  humor: number,
+  emotion: number
+): string => {
   const humorInstr = getHumorGuidance(platformId, humor);
   const emotionInstr = getEmotionGuidance(platformId, emotion);
 
@@ -69,23 +73,33 @@ const getMoodInstruction = (platformId: string, humor: number, emotion: number):
   `;
 };
 
-const getLengthInstruction = (option: string, platformId: string, allowPremiumLong: boolean): string => {
+const getLengthInstruction = (
+  option: string,
+  platformId: string,
+  allowPremiumLong: boolean
+): string => {
   let instruction = "";
   switch (option) {
     case "short":
-      instruction = "Keep the content very concise and to the point. Omit unnecessary filler. Focus on impact.";
+      instruction =
+        "Keep the content very concise and to the point. Omit unnecessary filler. Focus on impact.";
       break;
     case "long":
-      instruction = "Provide a detailed and expansive explanation. Explore the topic in depth. Use more descriptive language.";
+      instruction =
+        "Provide a detailed and expansive explanation. Explore the topic in depth. Use more descriptive language.";
       break;
     default:
-      instruction = "Write at a standard length, balancing detail and readability.";
+      instruction =
+        "Write at a standard length, balancing detail and readability.";
   }
   const defaultLimitNote =
     "Note: Even for 'Long', strictly adhere to the hard character limits of the selected platform (e.g., 280 characters for a Twitter single post).";
   const premiumLongNote =
     "Note: This is an X Premium long post—use up to 4,000 characters in a single message while keeping readability high.";
-  const limitNote = platformId === "twitter" && allowPremiumLong ? premiumLongNote : defaultLimitNote;
+  const limitNote =
+    platformId === "twitter" && allowPremiumLong
+      ? premiumLongNote
+      : defaultLimitNote;
   return `\n[Content Length: ${option.toUpperCase()}]\n${instruction} ${limitNote}`;
 };
 
@@ -185,6 +199,7 @@ const GOOGLE_MAP_CONTEXT_INSTRUCTION = `
   Never ask the reviewer to visit the store or require in-person contact; do not request phone, email, DM, or form follow-up, nor ask them any further questions. Keep the reply fully self-contained without asking for any additional action.
   When referencing the review, do not parrot the exact sentences or wording. Summarize the impression from the business perspective using naturally phrased gratitude, empathy, or explanation.
   Stick to short-to-medium length sentences and limit emojis; the output should be a single reply message with no extra commentary.
+  PROHIBITED: Do not invent promotions, discounts, or specific campaign dates that are not in the user input.
 `;
 
 const STRUCTURE_INSTRUCTIONS: Record<string, string> = {
@@ -221,9 +236,15 @@ const STRUCTURE_INSTRUCTIONS: Record<string, string> = {
   `,
 };
 
-const getStructureInstruction = (platformId: string, intent: string): string => {
+const getStructureInstruction = (
+  platformId: string,
+  intent: string
+): string => {
   if (platformId !== "googlemap") return "";
-  return STRUCTURE_INSTRUCTIONS[intent] || STRUCTURE_INSTRUCTIONS[GOOGLE_MAP_INTENT_IDS.AUTO];
+  return (
+    STRUCTURE_INSTRUCTIONS[intent] ||
+    STRUCTURE_INSTRUCTIONS[GOOGLE_MAP_INTENT_IDS.AUTO]
+  );
 };
 
 const ensureOpenAIKey = (): OpenAI => {
@@ -298,20 +319,37 @@ export const generatePost = async (
 
   const perspectiveInstruction = getPerspectiveInstruction(perspective);
   const intentInstruction = getIntentInstruction(postIntent);
-  const moodInstruction = getMoodInstruction(platformId, humorLevel, emotionLevel);
+  const moodInstruction = getMoodInstruction(
+    platformId,
+    humorLevel,
+    emotionLevel
+  );
   const premiumLongActive = platformId === "twitter" && isPremiumLongPost;
-  const lengthInstruction = getLengthInstruction(lengthOption, platformId, premiumLongActive);
-  const googleMapLengthInstruction = platformId === "googlemap" ? getGoogleMapLengthInstruction(lengthOption) : "";
-  const threadInstruction = platformId === "twitter" ? getThreadInstruction(isThreadMode) : "";
-  const videoInstruction = platformId === "tiktok" ? getVideoInstruction(isLongVideo) : "";
+  const lengthInstruction = getLengthInstruction(
+    lengthOption,
+    platformId,
+    premiumLongActive
+  );
+  const googleMapLengthInstruction =
+    platformId === "googlemap"
+      ? getGoogleMapLengthInstruction(lengthOption)
+      : "";
+  const threadInstruction =
+    platformId === "twitter" ? getThreadInstruction(isThreadMode) : "";
+  const videoInstruction =
+    platformId === "tiktok" ? getVideoInstruction(isLongVideo) : "";
   const languageInstruction = `\n\nIMPORTANT: Output the final result in ${language}.`;
-  const googleMapContextInstruction = platformId === "googlemap" ? GOOGLE_MAP_CONTEXT_INSTRUCTION : "";
+  const googleMapContextInstruction =
+    platformId === "googlemap" ? GOOGLE_MAP_CONTEXT_INSTRUCTION : "";
   const structureInstruction = getStructureInstruction(platformId, postIntent);
   const customUserInstruction =
     isPro && customInstruction.trim()
       ? `\n\n[IMPORTANT USER INSTRUCTION]: ${customInstruction.trim()}`
       : "";
-  const premiumLongInstruction = platformId === "twitter" ? getPremiumLongInstruction(premiumLongActive) : "";
+  const premiumLongInstruction =
+    platformId === "twitter"
+      ? getPremiumLongInstruction(premiumLongActive)
+      : "";
 
   let finalSystemInstruction = buildSystemInstruction(
     strategy.systemInstruction,
@@ -374,17 +412,17 @@ Perspective: ${perspective}
   };
 
   if (variantCount > 1) {
-    const variants: string[] = [];
-    for (let i = 0; i < variantCount; i += 1) {
-      variants.push(await generateOnce());
-    }
-    return variants;
+    const promises = Array.from({ length: variantCount }, () => generateOnce());
+    return await Promise.all(promises);
   }
 
   return generateOnce();
 };
 
-export const generatePostImage = async (postContent: string, platform: string): Promise<string> => {
+export const generatePostImage = async (
+  postContent: string,
+  platform: string
+): Promise<string> => {
   const openai = ensureOpenAIKey();
 
   const imagePrompt = `
